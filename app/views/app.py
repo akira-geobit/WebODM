@@ -32,24 +32,26 @@ def index(request):
     return redirect(settings.LOGIN_REDIRECT_URL if request.user.is_authenticated
                     else settings.LOGIN_URL)
 
-@login_required
 def dashboard(request):
-    no_processingnodes = ProcessingNode.objects.count() == 0
-    if no_processingnodes and settings.PROCESSING_NODES_ONBOARDING is not None:
-        return redirect(settings.PROCESSING_NODES_ONBOARDING)
+    jwt_token = request.GET.get('jwt', None)
+    if jwt_token:
+        no_processingnodes = ProcessingNode.objects.count() == 0
+        if no_processingnodes and settings.PROCESSING_NODES_ONBOARDING is not None:
+            return redirect(settings.PROCESSING_NODES_ONBOARDING)
 
-    no_tasks = Task.objects.filter(project__owner=request.user).count() == 0
-    no_projects = Project.objects.filter(owner=request.user).count() == 0
+        no_tasks = Task.objects.filter(project__owner=request.user).count() == 0
+        no_projects = Project.objects.filter(owner=request.user).count() == 0
 
-    # Create first project automatically
-    if no_projects and request.user.has_perm('app.add_project'):
-        Project.objects.create(owner=request.user, name=_("First Project"))
+        # Create first project automatically
+        if no_projects and request.user.has_perm('app.add_project'):
+            Project.objects.create(owner=request.user, name=_("First Project"))
 
-    return render(request, 'app/dashboard.html', {'title': _('Dashboard'),
-        'no_processingnodes': no_processingnodes,
-        'no_tasks': no_tasks
-    })
-
+        return render(request, 'app/dashboard.html', {'title': _('Dashboard'),
+            'no_processingnodes': no_processingnodes,
+            'no_tasks': no_tasks
+        })
+    else:
+        return redirect(settings.LOGIN_URL)
 
 @login_required
 def map(request, project_pk=None, task_pk=None):

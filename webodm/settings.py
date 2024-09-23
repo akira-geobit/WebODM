@@ -43,6 +43,8 @@ except ImportError:
 
         print("Generated secret key")
 
+JWT_SECRET_KEY = 'n6J9kM_Ez6fE8vF7L9RvLzYH8dXzXo2tG9Pk4cA8LXU='
+
 with open(os.path.join(BASE_DIR, 'package.json')) as package_file:
     data = json.load(package_file)
     VERSION = data['version']
@@ -368,7 +370,7 @@ NODE_OFFLINE_MINUTES = 5
 NODE_OPTIMISTIC_MODE = False
 
 # URL to external auth endpoint
-EXTERNAL_AUTH_ENDPOINT = ''
+EXTERNAL_AUTH_ENDPOINT = '/external-token-auth/'
 
 # URL to a page where a user can reset the password
 RESET_PASSWORD_LINK = ''
