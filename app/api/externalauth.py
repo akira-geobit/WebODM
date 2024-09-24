@@ -6,27 +6,33 @@ from rest_framework.response import Response
 from app.auth.backends import get_user_from_external_auth_response
 import requests
 from webodm import settings
-import jwt
+
 class ExternalTokenAuth(APIView):
     permission_classes = (permissions.AllowAny,)
     parser_classes = (parsers.JSONParser, parsers.FormParser,)
 
     def post(self, request):
-        token = request.query_params.get('jwt', '')
+        # This should never happen
+        if settings.EXTERNAL_AUTH_ENDPOINT == '':
+            return Response({'error': 'EXTERNAL_AUTH_ENDPOINT not set'})
+
+        token = request.COOKIES.get('external_access_token', '')
         if token == '':
-            return Response({'error': 'external_access_token cookie not set'}, status=400)
+            return Response({'error': 'external_access_token cookie not set'})
 
         try:
-            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=['HS256'])
-            sender_id = payload.get('user_id')
-            if sender_id is None:
-                return Response({'error': 'Invalid token payload'}, status=400)
-            return Response({'redirect': settings.LOGIN_REDIRECT_URL})
-        
-        except jwt.ExpiredSignatureError:
-            return Response({'error': 'Token has expired'}, status=401)
-        except jwt.DecodeError:
-            return Response({'error': 'Invalid token'}, status=400)
+            r = requests.post(settings.EXTERNAL_AUTH_ENDPOINT, headers={
+                'Authorization': "Bearer %s" % token 
+            })
+            res = r.json()
+            if res.get('user_id') is not None:
+                user = get_user_from_external_auth_response(res)
+                if user is not None:
+                    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+                    return Response({'redirect': '/'})
+                else:
+                    return Response({'error': 'Invalid credentials'})
+            else:
+                return Response({'error': res.get('message', 'Invalid external server response')})
         except Exception as e:
-            return Response({'error': str(e)}, status=500)
-
+            return Response({'error': str(e)})

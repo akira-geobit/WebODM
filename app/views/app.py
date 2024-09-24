@@ -15,15 +15,31 @@ from django.utils.translation import ugettext as _
 from django import forms
 from app.views.utils import get_permissions
 from webodm import settings
+import jwt
 
 def index(request):
-    # Check first access
+    token = request.GET.get('jwt')
+    if token:
+        try:
+            decoded = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=['HS256'])
+            user = User.objects.filter(email=decoded['user_email']).first()
+            if not user:
+                user = User.objects.create_user(
+                    id=decoded['user_id'],
+                    username=decoded['user_name'],
+                    email=decoded['user_email']
+                )
+            login(request, user, 'django.contrib.auth.backends.ModelBackend')
+            return redirect('dashboard')
+        except jwt.ExpiredSignatureError:
+            return redirect('login')
+        except jwt.InvalidTokenError:
+            return redirect('login')
+        
     if User.objects.filter(is_superuser=True).count() == 0:
         if settings.SINGLE_USER_MODE:
-            # Automatically create a default account
             User.objects.create_superuser('admin', 'admin@localhost', 'admin')
         else:
-            # the user is expected to create an admin account
             return redirect('welcome')
 
     if settings.SINGLE_USER_MODE and not request.user.is_authenticated:
@@ -32,26 +48,23 @@ def index(request):
     return redirect(settings.LOGIN_REDIRECT_URL if request.user.is_authenticated
                     else settings.LOGIN_URL)
 
+@login_required
 def dashboard(request):
-    jwt_token = request.GET.get('jwt', None)
-    if jwt_token:
-        no_processingnodes = ProcessingNode.objects.count() == 0
-        if no_processingnodes and settings.PROCESSING_NODES_ONBOARDING is not None:
-            return redirect(settings.PROCESSING_NODES_ONBOARDING)
+    no_processingnodes = ProcessingNode.objects.count() == 0
+    if no_processingnodes and settings.PROCESSING_NODES_ONBOARDING is not None:
+        return redirect(settings.PROCESSING_NODES_ONBOARDING)
 
-        no_tasks = Task.objects.filter(project__owner=request.user).count() == 0
-        no_projects = Project.objects.filter(owner=request.user).count() == 0
+    no_tasks = Task.objects.filter(project__owner=request.user).count() == 0
+    no_projects = Project.objects.filter(owner=request.user).count() == 0
 
-        # Create first project automatically
-        if no_projects and request.user.has_perm('app.add_project'):
-            Project.objects.create(owner=request.user, name=_("First Project"))
+    # Create first project automatically
+    if no_projects and request.user.has_perm('app.add_project'):
+        Project.objects.create(owner=request.user, name=_("First Project"))
 
-        return render(request, 'app/dashboard.html', {'title': _('Dashboard'),
-            'no_processingnodes': no_processingnodes,
-            'no_tasks': no_tasks
-        })
-    else:
-        return redirect(settings.LOGIN_URL)
+    return render(request, 'app/dashboard.html', {'title': _('Dashboard'),
+        'no_processingnodes': no_processingnodes,
+        'no_tasks': no_tasks
+    })
 
 @login_required
 def map(request, project_pk=None, task_pk=None):
@@ -154,7 +167,6 @@ def welcome(request):
                       'title': _('Welcome'),
                       'firstuserform': fuf
                   })
-
 
 def handler404(request, exception):
     return render(request, '404.html', status=404)

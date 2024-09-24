@@ -2,41 +2,11 @@
 {% load i18n %}
 
 {% block registration_content %}
-    <div class="alert alert-info">
-        <strong>{% trans 'Authentication Required" %}</strong>
-        <p>{% trans 'Please log in through the Geobit project.' %}</p>
+    <div class="alert alert-info text-center" style="max-width: 500px; margin: 0 auto;">
+        <strong class="d-block mb-3">{% trans "Authentication Required" %}</strong>
+        <p class="mb-4">{% trans 'Please log in through the Geobit project.' %}</p>
         <p>
             <a href="http://localhost:5000" class="btn btn-primary">{% trans 'Go to Geobit Login' %}</a>
         </p>
     </div>
-
-    {% if has_external_auth %}
-    <script>
-        $(function(){
-            const urlParams = new URLSearchParams(window.location.search);
-            const jwtToken = urlParams.get('jwt');
-
-            if (!jwtToken) {
-                alert('No valid token found. Please log in through the Geobit project.');
-                return;
-            }
-
-            $.ajax({
-                url: '/external-token-auth',
-                type: 'POST',
-                data: { jwt: jwtToken },
-                success: function(res) {
-                    if (res.redirect) {
-                        window.location.href = res.redirect;
-                    } else if (res.error) {
-                        console.error(res.error);
-                    }
-                },
-                error: function() {
-                    console.error('Auto login failed');
-                }
-            });
-        });
-    </script>
-    {% endif %}
 {% endblock %}
